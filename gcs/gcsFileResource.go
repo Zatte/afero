@@ -1,6 +1,7 @@
 package gcs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -160,6 +161,13 @@ func (o *gcsFileResource) WriteAt(b []byte, off int64) (n int, err error) {
 	return written, err
 }
 
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
 func (o *gcsFileResource) Truncate(wantedSize int64) error {
 	if wantedSize < 0 {
 		return ErrOutOfRange
@@ -178,9 +186,12 @@ func (o *gcsFileResource) Truncate(wantedSize int64) error {
 		return err
 	}
 
+	MAX_WRITE_SIZE := 10000
 	for written < wantedSize {
-		if w, err := w.Write([]byte(" ")); err != nil {
-			break //maybe panic?
+		//Bulk up padding writes
+		paddingBytes := bytes.Repeat([]byte(" "), min(MAX_WRITE_SIZE, int(wantedSize-written)))
+		if w, err := w.Write(paddingBytes); err != nil {
+			return err
 		} else {
 			written += int64(w)
 		}
